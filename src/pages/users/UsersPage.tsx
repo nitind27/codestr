@@ -9,7 +9,6 @@ import { Avatar } from '@components/ui/Avatar';
 import { Button } from '@components/ui/Button';
 import { Modal } from '@components/ui/Modal';
 import { Breadcrumbs } from '@components/navigation/Breadcrumbs';
-import { userService } from '@services/user.service';
 import { QUERY_KEYS } from '@constants/query-keys.constants';
 import { useTableState } from '@hooks/useTableState';
 import { useDebounce } from '@hooks/useDebounce';
@@ -26,8 +25,8 @@ const statusVariant: Record<string, Variant> = {
   pending: 'warning',
 };
 
-// Mock data for demo
-const mockUsers: User[] = Array.from({ length: 25 }, (_, i) => ({
+// ─── Mock data ───────────────────────────────────────────────────────────────
+const ALL_USERS: User[] = Array.from({ length: 25 }, (_, i) => ({
   id: String(i + 1),
   name: ['Alice Johnson', 'Bob Smith', 'Charlie Brown', 'Diana Prince', 'Ethan Hunt'][i % 5],
   email: `user${i + 1}@example.com`,
@@ -37,6 +36,27 @@ const mockUsers: User[] = Array.from({ length: 25 }, (_, i) => ({
   createdAt: new Date(Date.now() - i * 86400000 * 3).toISOString(),
   updatedAt: new Date().toISOString(),
 }));
+
+function getMockUsers(page: number, limit: number, search: string) {
+  const filtered = search
+    ? ALL_USERS.filter(
+        (u) =>
+          u.name.toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase())
+      )
+    : ALL_USERS;
+
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / limit);
+  const data = filtered.slice((page - 1) * limit, page * limit);
+
+  return {
+    data,
+    meta: { total, page, limit, totalPages, hasNextPage: page < totalPages, hasPrevPage: page > 1 },
+    message: 'ok',
+    success: true,
+  };
+}
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -56,32 +76,11 @@ export default function UsersPage() {
       state.sortBy,
       state.sortOrder,
     ],
-    queryFn: () =>
-      userService.getUsers({
-        page: state.page,
-        limit: state.limit,
-        search: debouncedSearch,
-        sortBy: state.sortBy,
-        sortOrder: state.sortOrder || undefined,
-      }),
-    // Use mock data as placeholder
-    placeholderData: {
-      data: mockUsers.slice((state.page - 1) * state.limit, state.page * state.limit),
-      meta: {
-        total: mockUsers.length,
-        page: state.page,
-        limit: state.limit,
-        totalPages: Math.ceil(mockUsers.length / state.limit),
-        hasNextPage: state.page < Math.ceil(mockUsers.length / state.limit),
-        hasPrevPage: state.page > 1,
-      },
-      message: 'ok',
-      success: true,
-    },
+    queryFn: () => getMockUsers(state.page, state.limit, debouncedSearch),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => userService.deleteUser(id),
+    mutationFn: async (id: string) => id, // mock: just return the id
     onSuccess: () => {
       toast.success('User deleted successfully');
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USERS });
